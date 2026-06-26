@@ -83,15 +83,24 @@ This version replicates the calculator by [Vital Strategies](https://preventepid
 
 The work is supported by Vital Strategies.
 
-The deployment of this App to shinyapps.io uses the INLA repository at [https://github.com/inbo/INLA](https://github.com/inbo/INLA) to get around the issue of INLA not being on github or CRAN. Thanks INBO!
+The deployment of this App to shinyapps.io uses the official INLA repository at `https://inla.r-inla-download.org/R/stable/`.
 
 
 # Deployment notes
 
 ```
-# Deployment to shinyapps.io using R 4.1 
-install_github("inbo/INLA")
+# Install INLA from the official repository (not the old GitHub fork)
+options(repos = c(
+  CRAN = "https://cran.r-project.org",
+  INLA = "https://inla.r-inla-download.org/R/stable/"
+))
+install.packages("INLA")
+
+# Install the app package
+library(devtools)
 install_github("richardli/ExcessMortalityApp")
+
+# Deploy
 setwd("inst/shiny/")
 library(rsconnect)
 deployApp()
