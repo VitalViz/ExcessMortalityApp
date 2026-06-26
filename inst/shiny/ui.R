@@ -4,29 +4,6 @@ require("ExcessMortalityApp")
 require("markdown")
 require("INLA")
 
-# Fix INLA binary permissions on shinyapps.io:
-# Copy binaries to temp dir where we have full permissions, then point INLA there
-local({
-  inla_bin_dir <- system.file("bin/linux/64bit", package = "INLA")
-  if (nzchar(inla_bin_dir) && dir.exists(inla_bin_dir)) {
-    dst <- file.path(tempdir(), "inla_bin")
-    dir.create(dst, showWarnings = FALSE, recursive = TRUE)
-    bins <- list.files(inla_bin_dir, full.names = TRUE)
-    for (b in bins) {
-      dest_file <- file.path(dst, basename(b))
-      file.copy(b, dest_file, overwrite = TRUE)
-      Sys.chmod(dest_file, "0755")
-    }
-    mkl <- file.path(dst, "inla.mkl.run")
-    plain <- file.path(dst, "inla.run")
-    if (file.exists(mkl)) {
-      INLA::inla.setOption(inla.call = mkl)
-    } else if (file.exists(plain)) {
-      INLA::inla.setOption(inla.call = plain)
-    }
-  }
-})
-
 ui <- fluidPage(
   use_busy_spinner(spin = "fading-circle"),
 
