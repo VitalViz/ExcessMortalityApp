@@ -241,9 +241,13 @@ observeEvent(input$processMe, {
 
        rv[['cleanTab']] <- summary_table(time_case, T, years, morData)
        if(input$which_model == "Simple Baseline"){
-         rv[['excess']] <- base_model(time_case, T, years, morData, "sexCol", "ageCol", "popCol", "timeCol", use.rate = FALSE)        
+         rv[['excess']] <- base_model(time_case, T, years, morData, "sexCol", "ageCol", "popCol", "timeCol", use.rate = FALSE)
        }else{
-
+        if (!requireNamespace("INLA", quietly = TRUE)) {
+          output$message_file_upload <- renderText("Error: The INLA package is required for Poisson Regression but is not available on this server. Please select 'Simple Baseline' instead.")
+          return(NULL)
+        }
+        library(INLA)
         show_modal_spinner(text = "Fitting the Excess Mortality Model") # show the spinner
         rv[['excess']] <- smooth_model(time_case = time_case, T = T, years = years, morData = morData, sexCol = "sexCol", ageCol = "ageCol", popCol = "popCol", timeCol = "timeCol", use.rate = TRUE)
         remove_modal_spinner() # hide the spinner

@@ -6,10 +6,6 @@ library(DT)
 library(lubridate)
 library(stats)
 
-if (!requireNamespace("INLA", quietly = TRUE)) {
-  install.packages("INLA",
-    repos = c(INLA = "https://inla.r-inla-download.org/R/stable",
-              getOption("repos")))
-}
-library(INLA)
+# INLA is loaded on-demand in server.R when Poisson Regression is selected.
+# Loading it here at startup crashes the app if the package is unavailable.
 
