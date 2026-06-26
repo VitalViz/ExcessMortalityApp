@@ -88,6 +88,9 @@ The deployment of this App to shinyapps.io uses the INLA repository at [https://
 
 # Deployment notes
 
+Use `rig` to switch to R 4.1: `rig default 4.1`. 
+
+
 ```
 # Deployment to shinyapps.io using R 4.1 
 install_github("inbo/INLA")
