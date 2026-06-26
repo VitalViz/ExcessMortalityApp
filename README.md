@@ -20,7 +20,7 @@ library(devtools)
 install_github("richardli/ExcessMortalityApp")
 ```
 
-The previous steps only need to be run when installing the first time or when updating the sofater. Once installed, the App can be launched by running the following command in `R`. 
+The previous steps only need to be run when installing the first time or when updating the software. Once installed, the App can be launched by running the following command in `R`. 
 ```
 library(ExcessMortalityApp)
 launchApp()
@@ -33,7 +33,7 @@ The App will then open in the default browser.
 The input data file should be a CSV file containing death counts over time, and possibly by subpopulation. The required data input is in the "long format", where each row correspond to the death count of a given population at a given time. The dataset should include at least the following required columns (with the exact column names):
 
 + `year`: numerical value, e.g., 2015, 2016, ...
-+ `month` or `week`: numerical value. For monthly data input, the `month` field is required to be from 1 to 12. For weekly data input, the `week` field is required to be from 1 to 53.
++ `month`, `week`, or `period`: numerical value. For monthly data, the `month` field is required to be from 1 to 12. For weekly data, the `week` field is required to be from 1 to 53. For custom periods, the `period` field should be from 1 to N (the number of periods per year).
 + `deaths`: numerical value. This is the death count for the corresponding year and month/week. 
 
 
@@ -47,11 +47,27 @@ The App adds up all deaths within each month/week to produce the total deaths an
 
 The variables corresponding to age, sex, and population need to be specified manually in the App. If the variables are named "sex", "age", and "population" already, the variables will be automatically picked up by the App. When left unspecified, the App will ignore the age/sex breakdown.
 
+# Features
+
+## Configurable Baseline and Analysis Periods
+The boundary between baseline (reference) and analysis periods is configurable. By default, it is set to 2020 if available in the data. Users can also exclude specific anomalous years (e.g., 2020-2022 for COVID-19) entirely — excluded years are removed from both baseline estimation and excess computation. For the Poisson Regression model, excluded years remain in the time series (with missing deaths) so the trend component maintains temporal continuity, but no excess estimates are produced for them.
+
+## Time Scale Options
+- **Monthly**: Standard monthly analysis (12 periods per year). Input data must have a `month` column (1-12).
+- **Weekly**: Weekly analysis (up to 53 periods per year). Input data must have a `week` column (1-53).
+- **Custom periods**: User-defined number of periods per year (e.g., 4 for quarterly, 6 for bimonthly). Input data must have a `period` column with values from 1 to N, where N is the number of periods per year. Data should already be aggregated to the desired period level.
+
+## Minimum Data Validation
+The app validates that sufficient baseline data is available and displays warnings when estimates may be unreliable. At least 3 baseline years are recommended; 5 or more are ideal.
+
 # Troubleshooting
 
 When errors occur, the most likely reason is because the input data are ill-formatted. The easiest approach to reset the app is by refreshing the page in the browser. Example input format are included in the links on the left navigation bar. 
 
 # Version history
+
+## version 0.3.0
+This version adds configurable baseline/analysis year splits, COVID year exclusion, K-monthly time scale aggregation, minimum data validation with warnings, and fixes the partial-year line bug in the Historical Data Explorer. Simulated demo datasets are included in `data-raw/`.
 
 ## version 0.2.1
 Minor bug fix and usability improvements.

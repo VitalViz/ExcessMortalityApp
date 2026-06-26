@@ -4,51 +4,88 @@ output:
   bookdown::html_book:
     number_sections: false
 ---
- 
+
 
 This page has a description of the statistical methods used in the excess mortality calculator.
 
 #### Overview
 
-The calculator implements two excess mortality models. Both models proceeds in the following steps: 
+The calculator implements two excess mortality models. Both models proceeds in the following steps:
 
-1. Expected deaths from 2020 onward are first calculated based on historical deaths before 2020. Both a point estimate and uncertainty of the expected deaths are computed.
-2. Excess deaths from 2020 onward are computed by the difference between the observed deaths and the expected deaths computed in the first step. The 95% uncertainty interval of the excess deaths at each time period is computed as the difference between the observed deaths and the lower and upper uncertainty interval of the expected deaths.
+1. Expected deaths during the **analysis period** are first calculated based on historical deaths during the **baseline period**. Both a point estimate and uncertainty of the expected deaths are computed.
+2. Excess deaths during the analysis period are computed by the difference between the observed deaths and the expected deaths computed in the first step. The 95% uncertainty interval of the excess deaths at each time period is computed as the difference between the observed deaths and the lower and upper uncertainty interval of the expected deaths.
 3. If there are multiple sex and age groups in the data, the process is repeated for the aggregated total deaths first, then for each sex, age, and sex-age combinations separately.
 
 The two models differ in the first step only. The detailed methods are described below. The notations are as follows. For simplicity, we consider only one population (not stratified by sex or age) in the description below.
 
 + $T$ is the total number of time periods (weeks or months) in the mortality data.
-+ $T_0$ is the number of time period pre-pandemic. The calculator sets $T_0$ to be the last month or week of 2019.
++ $T_0$ is the number of time periods in the baseline period. The user can configure where the baseline period ends and the analysis period begins using the "First year of analysis period" setting.
 + $J[t], t = 1, 2, ..., T$ is the month or week index for time period $t$. For example, if the analysis is performed at the monthly level, and the 14th time period in the data is March, then $J[14] = 3$.
-+ $Y_t, t = 1, 2, ..., T$ is the observed death count for time period $t$. 
-+ $\tilde Y_t, t = T_0+1, T_0 + 2, ..., T$ is the predicted death count for time period $t$ had there being no pandemic.
++ $Y_t, t = 1, 2, ..., T$ is the observed death count for time period $t$.
++ $\tilde Y_t, t = T_0+1, T_0 + 2, ..., T$ is the predicted death count for time period $t$ had there being no anomalous event.
 + $E_t, t = T_0+1, T_0 + 2, ..., T$ is the excess mortality at time $t$.
 + $P_t, t = T_0+1, T_0 + 2, ..., T$ is the population size at time $t$.
 
+#### Configurable Baseline and Analysis Periods
+
+The user can configure two aspects of the baseline period:
+
+1. **First year of analysis period**: All years before this value are considered the baseline period by default. The default is 2020 if the data includes 2020, otherwise the last year in the data.
+2. **Exclude anomalous years from baseline**: Specific years can be excluded entirely — they are removed from both the baseline estimation and the excess computation. This is useful when anomalous events (such as the COVID-19 pandemic during 2020-2022) would distort the baseline estimate. For the Poisson Regression model, excluded years remain in the time series with missing observations so the trend component maintains temporal continuity, but no excess estimates are produced for them.
+
+#### Minimum Data Requirements
+
+The accuracy of excess mortality estimates depends on having sufficient baseline data:
+
+<style>
+#min-data-table th, #min-data-table td { padding: 10px 20px; }
+</style>
+
+<table id="min-data-table">
+<thead>
+<tr><th>Baseline years</th><th>Simple Baseline</th><th>Poisson Regression</th></tr>
+</thead>
+<tbody>
+<tr><td>1 year</td><td>Point estimate only, no confidence intervals</td><td>Not supported (requires at least 2 years)</td></tr>
+<tr><td>2 years</td><td>Computable but very wide and unreliable CIs</td><td>Marginal (limited trend and seasonal data)</td></tr>
+<tr><td>3-4 years</td><td>Acceptable minimum</td><td>Acceptable minimum</td></tr>
+<tr><td>5+ years</td><td>Recommended</td><td>Recommended</td></tr>
+</tbody>
+</table>
+
+The calculator will display warnings when the number of baseline years is low and will automatically switch to the Simple Baseline model if there are fewer than 2 baseline years.
+
+#### Time Scale Options
+
+The calculator supports three time scale options:
+
+- **Monthly**: Data with a `month` column (1-12), producing 12 time periods per year.
+- **Weekly**: Data with a `week` column (1-53), producing up to 53 time periods per year.
+- **Custom periods**: Supports user-defined periods per year (e.g., 4 for quarterly, 6 for bimonthly). The input data must have a `period` column (1 to N, where N is the number of periods per year), and data should already be aggregated to the desired period level. Note that fewer periods per year produce coarser temporal resolution and may miss short-duration mortality peaks.
+
 #### Simple baseline method
 
-The simple baseline method is based on the calculator described at [this link](https://preventepidemics.org/covid19/resources/excess-mortality/). The method does not make use of the population data $P_t$. It estimates the expected death count as the average death counts in the same month/week during pre-pandemic years. That is, 
+The simple baseline method is based on the calculator described at [this link](https://preventepidemics.org/covid19/resources/excess-mortality/). The method does not make use of the population data $P_t$. It estimates the expected death count as the average death counts in the same month/week during baseline years. That is,
 $$
 \tilde Y_t =  \frac{\sum_{i: J[i] = J[t], i \leq T_0}Y_t}{\sum_{i: J[i] = J[t], i \leq T_0} 1}
 $$
-Note that under this model, the expected death counts for the same week/month over different years remains the same, thus it does not account for any across-year variation or time trend. 
+Note that under this model, the expected death counts for the same week/month over different years remains the same, thus it does not account for any across-year variation or time trend.
 
-The standard error of the expected death count $\tilde Y_t$ is estimated by the sample standard deviation of the death counts in the same month/week during pre-pandemic years, divided by the square root of the number of observations used to compute the sample average.
+The standard error of the expected death count $\tilde Y_t$ is estimated by the sample standard deviation of the death counts in the same month/week during baseline years, divided by the square root of the number of observations used to compute the sample average.
 
-Finally the 95% lower and upper confidence interval of the expected deaths are computed by the Wald type interval 
+Finally the 95% lower and upper confidence interval of the expected deaths are computed by the Wald type interval
 $$
 (\tilde Y_t - 1.96\times SE(\tilde Y_t),  \tilde Y_t + 1.96\times SE(\tilde Y_t))
-$$ 
+$$
 
-The excess death counts are computed by 
+The excess death counts are computed by
 $$
   E_t = Y_t - \tilde Y_t
 $$
-and the 95% confidence interval is given by 
+and the 95% confidence interval is given by
 $$
 (Y_t - \tilde Y_t - 1.96\times SE(\tilde Y_t), Y_t - \tilde Y_t + 1.96\times SE(\tilde Y_t))
-$$ 
+$$
 
 #### Poisson regression method
 
@@ -59,20 +96,20 @@ $$
 where $\mu_t$ is a latent parameter for the time-varying mortality rate. When population size is unknown, $P_t$ is treated as a constant and omitted from the model. The mortality rate $\mu_t$ is further assumed to decompose into three components
 $$
 log(\mu_t) = \alpha + \beta t + \eta_t + \gamma_{J[t]}
-$$ 
+$$
 where $\alpha$ is the global intercept; $\beta t$ captures the long-term linear trend in time; $\eta_t$ captures the long-term non-linear trend; and $\gamma_{J[t]}$ is the within-year seasonal effect. These latent parameters are given the following priors:
 
 + $\alpha$ and $\beta$ are fixed effects following a normal prior with a large variance.
-+ The long-term non-linear effect $\eta_t$ follows an autoregressive process of order 1 (AR(1)) over a low-resolution knots. More specifically, we put $K$ evenly spaced knots over the entire time period, and we can write $\eta_t = \sum_{k = 1}^K w_{tk}x_k + e_t$, where $x_1, ..., x_K$ is an AR(1) process on the $K$ knots, i.e., 
++ The long-term non-linear effect $\eta_t$ follows an autoregressive process of order 1 (AR(1)) over a low-resolution knots. More specifically, we put $K$ evenly spaced knots over the entire time period, and we can write $\eta_t = \sum_{k = 1}^K w_{tk}x_k + e_t$, where $x_1, ..., x_K$ is an AR(1) process on the $K$ knots, i.e.,
 $$
 	x_k = \rho x_{k-1} + \epsilon_k
-$$ 
+$$
 where $\epsilon_k \sim N(0, \sigma_{\eta}^2)$.
-The weights $w_{tk}$ for each time period $t$ is assigned such that when the time point is between two knots, the weight is inversely proportional to the distance from each knot. For formulation allows us to represent the observed non-linear change over time to be a slowly-varying function over a reduced set of time points. We put 4 evenly spaced knots per year by default. PC priors are used for the AR(1) process hyperparameters.
+The weights $w_{tk}$ for each time period $t$ is assigned such that when the time point is between two knots, the weight is inversely proportional to the distance from each knot. This formulation allows us to represent the observed non-linear change over time to be a slowly-varying function over a reduced set of time points. We put 4 evenly spaced knots per year by default. PC priors are used for the AR(1) process hyperparameters.
 + The seasonal effect $\gamma_{J[t]}$ is a random effect with first order random walk prior, i.e.
 $$
 \gamma_{j} = \gamma_{j-1} + \epsilon'_{j}$$
 where $\epsilon'_j \sim N(0, \sigma_{\gamma}^2)$. PC prior is used for $\sigma_{\gamma}^2$.
 
-The model is estimated by the INLA software. Posterior median and 95\% posterior credible intervals of $\tilde Y_t$ and $Y_t - \tilde Y_t$ are obtained from the fitted model directly, and used as the final estimates and uncertainty intervals. 
+The model is estimated by the INLA software. Posterior median and 95% posterior credible intervals of $\tilde Y_t$ and $Y_t - \tilde Y_t$ are obtained from the fitted model directly, and used as the final estimates and uncertainty intervals.
 
