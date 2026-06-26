@@ -74,7 +74,7 @@
     },
     "INLA": {
       "Source": "CRAN",
-      "Repository": "https://inla.r-inla-download.org/R/stable",
+      "Repository": "https://inla.r-inla-download.org/R/testing",
       "description": {
         "Package": "INLA",
         "Type": "Package",
