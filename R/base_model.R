@@ -9,7 +9,9 @@
 #' @param popCol column name for population variable
 #' @param timeCol column name for within-year time variable
 #' @param use.rate predict based on rate
-#' 
+#' @param years_obs optional vector of baseline years used for fitting. If NULL, defaults to years before 2020.
+#' @param years_pand optional vector of analysis years for excess computation. If NULL, defaults to years from 2020 onward.
+#'
 #' @import plotly  
 #' @import DT
 #' @import shinyWidgets
@@ -43,10 +45,10 @@
 #' out <- base_model(time_case = "Weekly", T = 53, years = c(2015:2021), morData = SampleInput3, 
 #' 			  sexCol = "sex", ageCol = "age", popCol = "population", timeCol = "week")
 
-base_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, timeCol, use.rate = FALSE){
+base_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, timeCol, use.rate = FALSE, years_obs = NULL, years_pand = NULL){
 	year <- NULL
-	years_obs <- sort(years[years < 2020])
-	years_pand <- sort(years[years >= 2020])
+	if(is.null(years_obs)) years_obs <- sort(years[years < 2020])
+	if(is.null(years_pand)) years_pand <- sort(years[years >= 2020])
 
 	base_model_internal <- function(time_case, T, morData, years_obs, grouping = NULL, use.rate){
 		if(is.null(grouping)){

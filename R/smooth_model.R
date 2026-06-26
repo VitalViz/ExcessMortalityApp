@@ -11,7 +11,9 @@
 #' @param use.rate predict based on rate
 #' @param knots_per_year number of AR1 knots per year.
 #' @param return_model logical indicator to print the model summary
-#' 
+#' @param years_obs optional vector of baseline years used for fitting. If NULL, defaults to years before 2020.
+#' @param years_pand optional vector of analysis years for excess computation. If NULL, defaults to years from 2020 onward.
+#'
 #' @import plotly  
 #' @import DT
 #' @importFrom shinyjs useShinyjs
@@ -73,14 +75,14 @@
 #' 			  popCol = "population", timeCol = "week", return_model=TRUE)
 #' summary(out$model$all[[1]])
 
-smooth_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, timeCol, use.rate = TRUE, knots_per_year = 4, return_model = FALSE){
-	group <- inla <- inla.mesh.1d <- inla.spde.make.A <- inla.stack <- inla.stack.A <- inla.stack.data <-  NULL 
+smooth_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, timeCol, use.rate = TRUE, knots_per_year = 4, return_model = FALSE, years_obs = NULL, years_pand = NULL){
+	group <- inla <- inla.mesh.1d <- inla.spde.make.A <- inla.stack <- inla.stack.A <- inla.stack.data <-  NULL
     if(!isTRUE(requireNamespace("INLA", quietly = TRUE))) {
          stop("You need to install the packages 'INLA'. Please run in your R terminal:\n  install.packages('INLA', repos=c(getOption('repos'), INLA='https://inla.r-inla-download.org/R/stable'), dep=TRUE)")
     }
     year <- NULL
-	years_obs <- sort(years[years < 2020])
-	years_pand <- sort(years[years >= 2020])
+	if(is.null(years_obs)) years_obs <- sort(years[years < 2020])
+	if(is.null(years_pand)) years_pand <- sort(years[years >= 2020])
 
 	smooth_model_internal <- function(time_case, T, years, morData, years_obs, grouping = NULL, use.rate){
 		if(is.null(grouping)){
@@ -102,11 +104,10 @@ smooth_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, t
 			}
 		}
 		dd$yearID <- dd$year - min(dd$year) + 1
+		dd$periodID <- dd[, timeCol]
 		if(time_case == "Monthly"){
-			dd$periodID <- dd[, timeCol]
-			n.seas <- 12
+			n.seas <- max(dd$periodID)
 		}else{
-			dd$periodID <- dd[, timeCol]
 			n.seas <- 52
 		}
 		dd$timeID <- (dd$yearID - 1) * max(dd$periodID) + dd$periodID
@@ -117,11 +118,8 @@ smooth_model <- function(time_case, T, years, morData, sexCol, ageCol, popCol, t
 		hyperprec = list(prec = list(prior = "pc.prec", param = c(1, 0.01)))
 
 		TT <- max(dd$timeID)
-		if(time_case == "Monthly"){
-			np <- 12 / knots_per_year
-		}else{
-			np <- 52 / knots_per_year
-		}
+		periods_per_year <- max(dd$periodID)
+		np <- max(1, periods_per_year / knots_per_year)
 		knots <- seq(1, TT, by = np)
 		mesh1d <- inla.mesh.1d(loc=knots)
 		mat <- inla.spde.make.A(mesh=mesh1d, loc=1:TT)

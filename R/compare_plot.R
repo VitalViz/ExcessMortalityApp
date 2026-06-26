@@ -100,16 +100,22 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
        
     
        if(plot_show == "Death Counts"){
-            title <- paste0("Observed Deaths by ", ifelse(month_or_week == "Monthly", "Month", "Week"), 
-                           " Compared to Expected Deaths")
+            n_periods_c <- if(month_or_week == "Monthly") max(toplot1$month, na.rm = TRUE) else 53
+            is_kmonthly_c <- (month_or_week == "Monthly" && n_periods_c < 12)
+            time_unit_c <- ifelse(month_or_week == "Monthly", "Period", "Week")
+            title <- paste0("Observed Deaths by ", time_unit_c, " Compared to Expected Deaths")
              colors <- grDevices::colorRampPalette(c('#fd8d3c', '#b10026'))(length(unique(toplot1$year)))
 
-            if(month_or_week == "Monthly"){
+            if(month_or_week == "Monthly" && !is_kmonthly_c){
               toplot1$time <- paste(toplot1$year, toplot1$month, 1, sep = "-")
               toplot1$time <- lubridate::ymd(toplot1$time)
-              # toplot1$time <- lubridate::ceiling_date(toplot1$time, "month") - lubridate::days(1)
+            }else if(month_or_week == "Monthly" && is_kmonthly_c){
+              toplot1$time <- paste(toplot1$year, toplot1$month, sep = "-P")
+              toplot1$time_order <- as.numeric(as.character(toplot1$year)) * 100 + as.numeric(toplot1$month)
+              periods_all <- unique(toplot1$time)
+              periods_sorted <- periods_all[order(toplot1$time_order[match(periods_all, toplot1$time)])]
+              toplot1$time <- match(toplot1$time, periods_sorted)
             }else{
-              # remove any week 53 that cannot be calculated
               toplot1$time <- paste(toplot1$year, toplot1$week, sep = "-W")
               toplot1$time_order <- as.numeric(as.character(toplot1$year)) * 100 + as.numeric(toplot1$week)
               weeks_all <- unique(toplot1$time)
@@ -118,38 +124,44 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
             }
             if(month_or_week == "Weekly"){
                 toplot1$time_label <- weeks_sorted[toplot1$time]
+            }else if(is_kmonthly_c){
+                toplot1$time_label <- periods_sorted[toplot1$time]
             }else{
                 toplot1$time_label <- toplot1$time
-            }   
-            g <- ggplot(toplot1) + aes(x = time, ymin = lower, ymax = upper, group = plot.group, 
-                                text = paste0("Time Period: ", time_label, 
-                                          "<br>Sub-population: ", plot.group, 
-                                          "<br>Observed Deaths: ", deaths, 
-                                          "<br>Expected Deaths: ", round(mean), 
-                                          "<br>Expected Lower Bound: ", round(lower), 
+            }
+            g <- ggplot(toplot1) + aes(x = time, ymin = lower, ymax = upper, group = plot.group,
+                                text = paste0("Time Period: ", time_label,
+                                          "<br>Sub-population: ", plot.group,
+                                          "<br>Observed Deaths: ", deaths,
+                                          "<br>Expected Deaths: ", round(mean),
+                                          "<br>Expected Lower Bound: ", round(lower),
                                           "<br>Expected Upper Bound: ", round(upper)
-                                            )) + 
-                  geom_ribbon(fill = "#a6cee3", color = NA, alpha = 0.5) + 
-                  geom_line(aes(y = mean, color = "Expected Deaths")) + 
-                  geom_line(aes(y = deaths, color = 'Observed Deaths'), linewidth = 0.9) + 
-                  ylab("Deaths") +  
-                  theme_bw()+ 
+                                            )) +
+                  geom_ribbon(fill = "#a6cee3", color = NA, alpha = 0.5) +
+                  geom_line(aes(y = mean, color = "Expected Deaths")) +
+                  geom_line(aes(y = deaths, color = 'Observed Deaths'), linewidth = 0.9) +
+                  ylab("Deaths") +
+                  theme_bw()+
                   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1), legend.position="bottom") +
                   scale_color_manual(name = "",
-                                     values = c("Expected Deaths" = "#1f78b4", 
+                                     values = c("Expected Deaths" = "#1f78b4",
                                                 "Observed Deaths" = "#d95f02"))
             if(by == "By Sex and Age"){
-                g <- g +  facet_grid(plot.group.age ~ plot.group.sex, scales = "free") 
+                g <- g +  facet_grid(plot.group.age ~ plot.group.sex, scales = "free")
             }else if(by == "By Sex"){
-                g <- g + facet_wrap(~plot.group, ncol = 2) 
+                g <- g + facet_wrap(~plot.group, ncol = 2)
             }else if(by == "By Age"){
-                g <- g + facet_wrap(~plot.group, ncol = 2, scales = "free") 
+                g <- g + facet_wrap(~plot.group, ncol = 2, scales = "free")
             }
 
 
             if(month_or_week == "Weekly"){
               breaks <- seq(1, length(weeks_sorted), by = round(length(weeks_sorted) / 20))
               values <- weeks_sorted[breaks]
+              g <- g + scale_x_continuous(breaks = breaks, labels = values)
+            }else if(is_kmonthly_c){
+              breaks <- seq(1, length(periods_sorted), by = max(1, round(length(periods_sorted) / 20)))
+              values <- periods_sorted[breaks]
               g <- g + scale_x_continuous(breaks = breaks, labels = values)
             }else{
               g <- g + scale_x_date(breaks = "3 month", expand = c(0.01, 0.01), date_labels = "%Y-%m")
@@ -159,14 +171,22 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
 
 
        if(grepl("Excess", plot_show)){
-            title <- paste0("Excess Deaths by ", ifelse(month_or_week == "Monthly", "Month", "Week"))
-            if(month_or_week == "Monthly"){
+            n_periods_ce <- if(month_or_week == "Monthly") max(toplot1$month, na.rm = TRUE) else 53
+            is_kmonthly_ce <- (month_or_week == "Monthly" && n_periods_ce < 12)
+            time_unit_ce <- ifelse(month_or_week == "Monthly", "Period", "Week")
+            title <- paste0("Excess Deaths by ", time_unit_ce)
+            if(month_or_week == "Monthly" && !is_kmonthly_ce){
               toplot1$time <- paste(toplot1$year, toplot1$month, 1, sep = "-")
               toplot1$time <- lubridate::ymd(toplot1$time)
-              # toplot1$time = lubridate::ceiling_date(toplot1$time, "month") - lubridate::days(1)
+            }else if(month_or_week == "Monthly" && is_kmonthly_ce){
+              toplot1 <- subset(toplot1, !is.na(excess))
+              toplot1$time <- paste(toplot1$year, toplot1$month, sep = "-P")
+              toplot1$time_order <- as.numeric(as.character(toplot1$year)) * 100 + as.numeric(toplot1$month)
+              periods_all <- unique(toplot1$time)
+              periods_sorted <- periods_all[order(toplot1$time_order[match(periods_all, toplot1$time)])]
+              toplot1$time <- match(toplot1$time, periods_sorted)
 			}else{
-			  # remove any week 53 that cannot be calculated
-			  toplot1 <- subset(toplot1, !is.na(excess))	
+			  toplot1 <- subset(toplot1, !is.na(excess))
               toplot1$time <- paste(toplot1$year, toplot1$week, sep = "-W")
               toplot1$time_order <- as.numeric(as.character(toplot1$year)) * 100 + as.numeric(toplot1$week)
               weeks_all <- unique(toplot1$time)
@@ -175,9 +195,11 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
             }
             if(month_or_week == "Weekly"){
                 toplot1$time_label <- weeks_sorted[toplot1$time]
+            }else if(is_kmonthly_ce){
+                toplot1$time_label <- periods_sorted[toplot1$time]
             }else{
                 toplot1$time_label <- toplot1$time
-            }   
+            }
             if(plot_show == "Excess Death Counts"){
                 g <- ggplot(toplot1) + aes(
                             x = time, ymin = lower, ymax = upper, y = excess, group = plot.group,
@@ -209,9 +231,11 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
                 }
                 if(month_or_week == "Weekly"){
                     toplot1$time_label <- weeks_sorted[toplot1$time]
+                }else if(is_kmonthly_ce){
+                    toplot1$time_label <- periods_sorted[toplot1$time]
                 }else{
                     toplot1$time_label <- toplot1$time
-                }   
+                }
                 g <- ggplot(toplot1) + aes(fill = plot.group, color = plot.group, x = time, ymin = lower, ymax = upper, y = excess, group = plot.group, 
                             text = paste0("Time Period: ", time_label, 
                                           "<br>Sub-population: ", plot.group, 
@@ -235,9 +259,13 @@ compare_plot <- function(model, by, month_or_week, plot_show, timeCol = "timeCol
               breaks <- seq(1, length(weeks_sorted), by = round(length(weeks_sorted) / 20))
               values <- weeks_sorted[breaks]
               g <- g + scale_x_continuous(breaks = breaks, labels = values)
+            }else if(is_kmonthly_ce){
+              breaks <- seq(1, length(periods_sorted), by = max(1, round(length(periods_sorted) / 20)))
+              values <- periods_sorted[breaks]
+              g <- g + scale_x_continuous(breaks = breaks, labels = values)
             }else{
               g <- g + scale_x_date(breaks = "month", expand = c(0.01, 0.01), date_labels = "%Y-%m")
-            }    
+            }
        }
 
 

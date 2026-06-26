@@ -38,12 +38,19 @@ ui <- fluidPage(
       selectizeInput(
           inputId="month_or_week", label=NULL,
           choices=c("Monthly" = "Monthly",
-                    "Weekly" = "Weekly"),
+                    "Weekly" = "Weekly",
+                    "Custom periods" = "Custom"),
           options = list(
             placeholder = 'Please select an option below',
             onInitialize = I('function() { this.setValue(""); }')
           ),
           width="300px"
+      ),
+      conditionalPanel("input.month_or_week == 'Custom'",
+        numericInput("n_periods", "Number of periods per year:",
+                     value = 4, min = 2, max = 26, step = 1, width = "300px"),
+        tags$small(tags$em("Input data must have a 'period' column (1 to N). Data should already be aggregated to the desired period level."),
+                   style = "color: #666;")
       ),
       
       # selectInput(inputId="month_or_week", label=NULL,
@@ -53,7 +60,18 @@ ui <- fluidPage(
       #             width="200px"),
       h4("Select Model"),
       selectInput("which_model", NULL, choices=c("Poisson Regression", "Simple Baseline"), width="300px"),
-      br(),      
+      br(),
+      h4("Baseline and Analysis Settings"),
+      numericInput("cutoff_year", "First year of excess mortality period:", value = 2020, min = 2010, max = 2030, step = 1),
+      checkboxInput("exclude_covid", "Exclude anomalous years from baseline", value = TRUE),
+      conditionalPanel("input.exclude_covid",
+        sliderInput("exclude_range", "Years to exclude:", min = 2010, max = 2030, value = c(2020, 2022), step = 1, sep = "")
+      ),
+      tags$div(id = "baseline_warning_area",
+        textOutput("baselineWarning")
+      ),
+      tags$head(tags$style("#baselineWarning{color: #e67300; font-weight: bold; font-size: 13px;}")),
+      br(),
       h4("Select Variables"),
       selectInput("raw_data_population", "Select Column Specifying Population Counts:", choices=c()),
       selectInput("raw_data_sex", "Select Column Specifying Sex:", choices=c()),
@@ -69,40 +87,43 @@ ui <- fluidPage(
           icon = icon("sliders"),
           block = TRUE), 
         align = "center"),
-      h4("Example input data:"),
+      h4("Download demo input data:"),
       downloadLink(
-          "downloadDataset1", "Download monthly example dataset"
+          "downloadDataset1", "Monthly example dataset (2015-2021)"
       ),
       br(),
-      # downloadLink(
-      #     "downloadDataset3", "Download monthly example dataset by sex"
-      # ),
-      # br(),
-      # downloadLink(
-      #     "downloadDataset2", "Download monthly example dataset by age"
-      # ),
-      # br(),
       downloadLink(
-          "downloadDataset4", "Download monthly example dataset by sex and age"
+          "downloadDataset4", "Monthly example by sex and age (2015-2021)"
       ),
       br(),
-      # h4("Example input data (weekly):"),
-      # downloadLink(
-      #     "downloadDataset5", "Download weekly example dataset"
-      # ),
-      # br(),
-      # downloadLink(
-      #     "downloadDataset6", "Download weekly example dataset by sex"
-      # ),
-      # br(),
-      # downloadLink(
-      #     "downloadDataset7", "Download weekly example dataset by age"
-      # ),
-      # br(),
       downloadLink(
-          "downloadDataset8", "Download weekly example dataset by sex and age"
+          "downloadDataset8", "Weekly example by sex and age (2015-2021)"
       ),
-      br(),      
+      br(),
+      downloadLink(
+          "downloadDemo4", "Monthly example by sex and age, partial year (2015-2025)"
+      ),
+      br(),
+      downloadLink(
+          "downloadDemo5", "Monthly, short baseline (2018-2025)"
+      ),
+      br(),
+      downloadLink(
+          "downloadDemo6", "Quarterly by sex, custom period demo (2010-2024)"
+      ),
+      br(),
+      br(),
+      h4("Download blank template:"),
+      fluidRow(
+        column(6, numericInput("template_year_start", "Start year:", value = 2015, min = 1900, max = 2100, step = 1)),
+        column(6, numericInput("template_year_end", "End year:", value = 2024, min = 1900, max = 2100, step = 1))
+      ),
+      selectInput("template_freq", "Frequency:", choices = c("Monthly" = "monthly", "Weekly" = "weekly", "Custom periods" = "custom"), selected = "monthly", width = "200px"),
+      conditionalPanel("input.template_freq == 'custom'",
+        numericInput("template_n_periods", "Periods per year:", value = 4, min = 2, max = 26, step = 1, width = "200px")
+      ),
+      checkboxGroupInput("template_groups", "Include columns:", choices = c("Sex" = "sex", "Age" = "age", "Population" = "population"), inline = TRUE),
+      downloadBttn("downloadTemplate", "Download Template CSV", size = "sm", style = "unite", color = "default", block = TRUE),
       br(),
       br()
     ),
@@ -178,7 +199,7 @@ ui <- fluidPage(
                       fonts: ['TeX'],
                       styles: {
                         scale: 110,
-                        '.MathJax': { padding: '1em 0.1em', color: 'royalblue ! important' }
+                        '.MathJax': { padding: '1em 0.1em', color: '#045a8d ! important' }
                       }
                     }
                 });

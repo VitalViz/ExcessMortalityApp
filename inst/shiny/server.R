@@ -106,10 +106,74 @@ function(input, output, session) {
     content = function(file){
       data(SampleInput3)
       options(scipen = 100)
-      write.csv(SampleInput3, file, row.names = FALSE)    
-    } 
-  )  
+      write.csv(SampleInput3, file, row.names = FALSE)
+    }
+  )
 
+  output$downloadDemo4 <- downloadHandler(
+    filename = function(){"SampleInput4_partial_year.csv"},
+    content = function(file){
+      demo_path <- system.file("extdata", "SampleInput4.csv", package = "ExcessMortalityApp")
+      if(demo_path == "") demo_path <- file.path(system.file(package = "ExcessMortalityApp"), "..", "..", "data-raw", "SampleInput4.csv")
+      if(file.exists(demo_path)){
+        file.copy(demo_path, file)
+      }else{
+        write.csv(data.frame(note = "Demo file not found"), file, row.names = FALSE)
+      }
+    }
+  )
+  output$downloadDemo5 <- downloadHandler(
+    filename = function(){"SampleInput5_short_baseline.csv"},
+    content = function(file){
+      demo_path <- system.file("extdata", "SampleInput5.csv", package = "ExcessMortalityApp")
+      if(demo_path == "") demo_path <- file.path(system.file(package = "ExcessMortalityApp"), "..", "..", "data-raw", "SampleInput5.csv")
+      if(file.exists(demo_path)){
+        file.copy(demo_path, file)
+      }else{
+        write.csv(data.frame(note = "Demo file not found"), file, row.names = FALSE)
+      }
+    }
+  )
+  output$downloadDemo6 <- downloadHandler(
+    filename = function(){"SampleInput6_kmonth_demo.csv"},
+    content = function(file){
+      demo_path <- system.file("extdata", "SampleInput6.csv", package = "ExcessMortalityApp")
+      if(demo_path == "") demo_path <- file.path(system.file(package = "ExcessMortalityApp"), "..", "..", "data-raw", "SampleInput6.csv")
+      if(file.exists(demo_path)){
+        file.copy(demo_path, file)
+      }else{
+        write.csv(data.frame(note = "Demo file not found"), file, row.names = FALSE)
+      }
+    }
+  )
+
+  output$downloadTemplate <- downloadHandler(
+    filename = function(){
+      paste0("template_", input$template_freq, "_", input$template_year_start, "-", input$template_year_end, ".csv")
+    },
+    content = function(file){
+      yrs <- seq(input$template_year_start, input$template_year_end)
+      if(input$template_freq == "monthly"){
+        periods <- 1:12
+        period_name <- "month"
+      } else if(input$template_freq == "custom"){
+        n_per <- as.numeric(input$template_n_periods)
+        periods <- 1:n_per
+        period_name <- "period"
+      } else {
+        periods <- 1:52
+        period_name <- "week"
+      }
+      tmpl <- expand.grid(period = periods, year = yrs)
+      colnames(tmpl)[1] <- period_name
+      tmpl <- tmpl[order(tmpl$year, tmpl[[period_name]]), ]
+      tmpl$deaths <- ""
+      if("population" %in% input$template_groups) tmpl$population <- ""
+      if("sex" %in% input$template_groups) tmpl$sex <- ""
+      if("age" %in% input$template_groups) tmpl$age <- ""
+      write.csv(tmpl, file, row.names = FALSE)
+    }
+  )
 
   output$fileUploaded <- reactive({
     updateSelectInput(session, "raw_data_population", 
@@ -124,6 +188,20 @@ function(input, output, session) {
     updateSelectInput(session, "raw_data_age", choices = c("None", colnames(getData())))
     if("age" %in% colnames(getData())){
       updateSelectInput(session, "raw_data_age", selected = "age")
+    }
+    dat <- getData()
+    if(!is.null(dat)){
+      cn <- tolower(colnames(dat))
+      if("year" %in% cn){
+        raw_years <- as.numeric(dat[, which(cn == "year")[1]])
+        raw_years <- sort(unique(raw_years[!is.na(raw_years)]))
+        if(length(raw_years) > 0){
+          default_cutoff <- if(2020 %in% raw_years) 2020 else max(raw_years)
+          updateNumericInput(session, "cutoff_year", value = default_cutoff, min = min(raw_years) + 1, max = max(raw_years))
+          updateSliderInput(session, "exclude_range", min = min(raw_years), max = max(raw_years),
+                            value = c(max(min(raw_years), 2020), min(max(raw_years), 2022)))
+        }
+      }
     }
     return(!is.null(getData()))
   })
@@ -151,6 +229,17 @@ observeEvent(input$processMe, {
        if(time_case == "Monthly"){
           T <- 12
           colnames(morData)[colnames(morData) == "month"] <- "timeCol"
+       }else if(time_case == "Custom"){
+          T <- as.numeric(input$n_periods)
+          colnames(morData)[colnames(morData) == "period"] <- "timeCol"
+          if(!"timeCol" %in% colnames(morData)){
+            output$message_file_upload <- renderText("Error: 'period' column does not exist in the input data. Custom periods require a 'period' column.")
+            rv$processed <- FALSE
+            return(NULL)
+          }
+          if(T <= 2){
+            showNotification(paste0("Note: Only ", T, " periods per year. Seasonal patterns will be very coarse."), type = "warning", duration = 8)
+          }
        }else{
           T <- 53
           colnames(morData)[colnames(morData) == "week"] <- "timeCol"
@@ -159,6 +248,8 @@ observeEvent(input$processMe, {
        if(!"timeCol" %in% colnames(morData)){
          if(time_case == "Monthly"){
               output$message_file_upload <- renderText("Error: 'month' column does not exist in the input data. Check your data file or the time scale is selected correctly.")
+          }else if(time_case == "Custom"){
+              output$message_file_upload <- renderText("Error: 'period' column does not exist in the input data. Check your data file or the time scale is selected correctly.")
           }else{
               output$message_file_upload <- renderText("Error: 'week' column does not exist in the input data. Check your data file or the time scale is selected correctly.")
           }
@@ -168,13 +259,13 @@ observeEvent(input$processMe, {
           output$message_file_upload <- NULL
        }
        if(sum(is.na(as.numeric(morData$timeCol))) > 0){
-           output$message_file_upload <- renderText("Error: Month or week in the input data include non-numerical values. Check your data file.")
+           output$message_file_upload <- renderText("Error: Time period in the input data includes non-numerical values. Check your data file.")
             return(NULL)
        }else{
           output$message_file_upload <- NULL
        }
        if(min(as.numeric(morData$timeCol), na.rm = TRUE) < 1){
-           output$message_file_upload <- renderText("Error: Month or week in the input data do not start from 1. Check your data file.")
+           output$message_file_upload <- renderText("Error: Time period in the input data does not start from 1. Check your data file.")
             return(NULL)
        }else{
           output$message_file_upload <- NULL
@@ -182,8 +273,10 @@ observeEvent(input$processMe, {
        if(max(as.numeric(morData$timeCol), na.rm = TRUE) > T){
         if(time_case == "Monthly"){
               output$message_file_upload <- renderText("Error: More than 12 months are found in the input data. Check your data file or the time scale is selected correctly.")
-          }else{
+          }else if(time_case == "Weekly"){
               output$message_file_upload <- renderText("Error: More than 53 weeks are found in the input data. Check your data file or the time scale is selected correctly.")
+          }else{
+              output$message_file_upload <- renderText(paste0("Error: More than ", T, " periods found in the data. Check your data file or the number of periods per year."))
           }
           return(NULL)
        }else{
@@ -210,11 +303,9 @@ observeEvent(input$processMe, {
        }else{
         colnames(morData)[which(colnames(morData) == tolower(input$raw_data_age))] <- "ageCol"
        }
-       # Change max history to 10 years
-       morData <- subset(morData, year >= 2010)
        print(dim(morData))
        if(dim(morData)[1] == 0 ){
-            output$message_file_upload <- renderText("Error: no data after 2010 in the input. Check the formatting of the 'year' column to make sure it is numeric.")
+            output$message_file_upload <- renderText("Error: no data in the input. Check the formatting of the 'year' column to make sure it is numeric.")
              return(NULL)
        }
        rv[['cleanData']] <- morData
@@ -236,16 +327,49 @@ observeEvent(input$processMe, {
         )
 
        ## ---------------------------------------------------------------------------------- ##
+       ##  Compute baseline and analysis year splits
+       ## ---------------------------------------------------------------------------------- ##
+
+       cutoff_year <- input$cutoff_year
+       exclude_years <- if(input$exclude_covid) seq(input$exclude_range[1], input$exclude_range[2]) else integer(0)
+
+       years_obs <- sort(years[years < cutoff_year & !(years %in% exclude_years)])
+       years_pand <- sort(years[years >= cutoff_year])
+       rv[['years_obs']] <- years_obs
+       rv[['years_pand']] <- years_pand
+       rv[['cutoff_year']] <- cutoff_year
+
+       n_baseline <- length(years_obs)
+       if(n_baseline < 1){
+         output$message_file_upload <- renderText("Error: No baseline years available. Increase the first year of the analysis period or adjust exclusion settings.")
+         rv$processed <- FALSE
+         return(NULL)
+       }
+       if(n_baseline < 2 && input$which_model == "Poisson Regression"){
+         showNotification("Only 1 baseline year available. Switching to Simple Baseline model (Poisson Regression requires at least 2 baseline years).", type = "warning", duration = 10)
+         updateSelectInput(session, "which_model", selected = "Simple Baseline")
+       }
+       warning_msg <- NULL
+       if(n_baseline == 1) warning_msg <- paste0("Warning: Only 1 baseline year (", years_obs, "). No confidence intervals can be computed.")
+       if(n_baseline == 2) warning_msg <- paste0("Warning: Only 2 baseline years (", paste(years_obs, collapse=", "), "). Confidence intervals may be unreliable.")
+       if(n_baseline >= 3 && n_baseline < 5) warning_msg <- paste0("Note: ", n_baseline, " baseline years. 5 or more years are recommended for robust estimates.")
+       output$baselineWarning <- renderText(warning_msg)
+
+       ## ---------------------------------------------------------------------------------- ##
        ##  Compute baseline and excess
        ## ---------------------------------------------------------------------------------- ##
 
-       rv[['cleanTab']] <- summary_table(time_case, T, years, morData)
-       if(input$which_model == "Simple Baseline"){
-         rv[['excess']] <- base_model(time_case, T, years, morData, "sexCol", "ageCol", "popCol", "timeCol", use.rate = FALSE)        
+       # For Custom periods, use "Monthly" as the internal model time_case
+       model_time_case <- if(time_case == "Custom") "Monthly" else time_case
+       rv[['time_case']] <- time_case
+
+       rv[['cleanTab']] <- summary_table(model_time_case, T, years, morData)
+       if(input$which_model == "Simple Baseline" || (n_baseline < 2)){
+         rv[['excess']] <- base_model(model_time_case, T, years, morData, "sexCol", "ageCol", "popCol", "timeCol", use.rate = FALSE, years_obs = years_obs, years_pand = years_pand)
        }else{
 
         show_modal_spinner(text = "Fitting the Excess Mortality Model") # show the spinner
-        rv[['excess']] <- smooth_model(time_case = time_case, T = T, years = years, morData = morData, sexCol = "sexCol", ageCol = "ageCol", popCol = "popCol", timeCol = "timeCol", use.rate = TRUE)
+        rv[['excess']] <- smooth_model(time_case = model_time_case, T = T, years = years, morData = morData, sexCol = "sexCol", ageCol = "ageCol", popCol = "popCol", timeCol = "timeCol", use.rate = TRUE, years_obs = years_obs, years_pand = years_pand)
         remove_modal_spinner() # hide the spinner
        }
        rv[["processed"]] <- TRUE
@@ -255,10 +379,14 @@ observeEvent(input$processMe, {
 )
 
 
+  plot_time_case <- reactive({
+    if(input$month_or_week == "Custom") "Monthly" else input$month_or_week
+  })
+
   output$baselinePlot <- renderPlotly({
-     req(input$processMe) 
+     req(input$processMe)
      tryCatch({
-       if(rv$processed) ggplotly(mortality_plot(rv$excess, input$baseline_show_sex, input$baseline_show_age, input$month_or_week, input$plot_show), tooltip = "text") %>% layout(legend = list(orientation = "v", x = 0.02, y = 0.95))
+       if(rv$processed) ggplotly(mortality_plot(rv$excess, input$baseline_show_sex, input$baseline_show_age, plot_time_case(), input$plot_show), tooltip = "text") %>% layout(legend = list(orientation = "v", x = 0.02, y = 0.98, xanchor = "left", yanchor = "top", bgcolor = "rgba(255,255,255,0.7)"))
       }, error = function(warn){
         return(NULL)
       })
@@ -267,16 +395,16 @@ observeEvent(input$processMe, {
   output$download_baseplot = downloadHandler(
     filename = function() {
       paste0(input$plot_show, "_", input$month_or_week, "_Sex_", input$baseline_show_sex, "_Age_", input$baseline_show_age, '.pdf')
-    }, 
+    },
     content = function(file) {
-      ggsave(file, plot = mortality_plot(rv$excess, input$baseline_show_sex, input$baseline_show_age, input$month_or_week, input$plot_show), width = 8, height = 5)
+      ggsave(file, plot = mortality_plot(rv$excess, input$baseline_show_sex, input$baseline_show_age, plot_time_case(), input$plot_show), width = 8, height = 5)
     })
 
   output$comparePlot <- renderPlotly({
-     req(input$processMe) 
+     req(input$processMe)
      tryCatch({
        if(rv$processed) {
-        g <- compare_plot(rv$excess, input$compare_plot_by, input$month_or_week, input$compare_plot_show)
+        g <- compare_plot(rv$excess, input$compare_plot_by, plot_time_case(), input$compare_plot_show)
         ndim <- wrap_dims(length(unique(ggplot_build(g)$data[[1]]$PANEL)))
         if(ndim[1] == 1) ndim[1] <- 1.5
         if(ndim[2] == 1) ndim[2] <- 2
@@ -289,8 +417,8 @@ observeEvent(input$processMe, {
         #     }
         #     }
         # }
-        ww <- ifelse(input$month_or_week == "Monthly", 300, 500)
-        gg %>% layout(height = 360 * ndim[1], width = ww * ndim[2] + 200) 
+        ww <- ifelse(plot_time_case() == "Monthly", 300, 500)
+        gg %>% layout(height = 360 * ndim[1], width = ww * ndim[2] + 200)
       }
       }, error = function(warn){
         return(NULL)
@@ -300,17 +428,20 @@ observeEvent(input$processMe, {
   output$download_compareplot = downloadHandler(
     filename = function() {
       paste0(input$compare_plot_show, "_", input$month_or_week, "_", input$compare_plot_by, '.pdf')
-    }, 
+    },
     content = function(file) {
-      ggsave(file, plot = compare_plot(rv$excess, input$compare_plot_by, input$month_or_week, input$compare_plot_show), width = 8)
+      ggsave(file, plot = compare_plot(rv$excess, input$compare_plot_by, plot_time_case(), input$compare_plot_show), width = 8)
     })
 
   output$baselineTab <- DT::renderDataTable({
-     req(input$processMe) 
+     req(input$processMe)
      tryCatch({
        if(rv$processed){
          tab <- rv$excess$excess[[input$baseline_show_sex]][[input$baseline_show_age]]
-          if(input$month_or_week == "Monthly"){
+          if(input$month_or_week == "Custom"){
+              tab$Period <- tab$timeCol
+              timeLabel = "Period"
+          }else if(plot_time_case() == "Monthly"){
               tab$Month <- tab$timeCol
               timeLabel = "Month"
            }else{
@@ -322,11 +453,11 @@ observeEvent(input$processMe, {
            colnames(tab)[1] <- "Year"
            colnames(tab)[3] <- "Actual Deaths"
            colnames(tab)[4] <- "Excess Deaths"
-           # colnames(tab)[5] <- "Standard Error of Excess"
            colnames(tab)[5] <- "Lower limit of Excess (95% CI)"
-           colnames(tab)[6] <- "Uower limit of Excess (95% CI)"
-           # tab <- round(tab, 0)
-           if(input$month_or_week == "Monthly"){
+           colnames(tab)[6] <- "Upper limit of Excess (95% CI)"
+           if(input$month_or_week == "Custom"){
+              tab <- tab[with(tab, order(Year, Period)), ]
+           }else if(plot_time_case() == "Monthly"){
               tab <- tab[with(tab, order(Year, Month)), ]
            }else{
               tab <- tab[with(tab, order(Year, Week)), ]
@@ -347,19 +478,24 @@ observeEvent(input$processMe, {
   })
 
 
-  output$tableSummary <- renderTable(rv$cleanTab[[input$table_show_type]][[input$table_show_sex]][[input$table_show_age]], digits = 0, align = "c")
+  output$tableSummary <- renderTable(rv$cleanTab[[input$table_show_type]][[input$table_show_sex]][[input$table_show_age]], digits = 0, align = "c", na = "")
 
   output$linePlotSummary <- renderPlotly({
     tab <- rv$cleanTab[[input$table_show_type]][[input$table_show_sex]][[input$table_show_age]]
     x <- colnames(tab)[1]
     tab[,1] <- factor(tab[,1], levels = tab[,1])
     years <- as.numeric(colnames(tab)[-1])
-    colors <- c(grDevices::colorRampPalette(c('#6baed6', '#084594'))(length(years[years < 2020
-      ])), grDevices::colorRampPalette(c('#fd8d3c', '#b10026'))(length(years[years >= 2020
-      ])))
-    if(input$month_or_week != "Monthly"){
+    cy <- if(!is.null(rv$cutoff_year)) rv$cutoff_year else 2020
+    n_base <- max(1, length(years[years < cy]))
+    n_analysis <- max(1, length(years[years >= cy]))
+    colors <- c(grDevices::colorRampPalette(c('#6baed6', '#084594'))(n_base),
+                grDevices::colorRampPalette(c('#fd8d3c', '#b10026'))(n_analysis))
+    if(input$month_or_week == "Weekly"){
         ww <- " week"
         xlab <- "Week"
+    }else if(input$month_or_week == "Custom"){
+        ww <- " period"
+        xlab <- "Period"
     }else{
         ww <- ""
         xlab <- "Month"
