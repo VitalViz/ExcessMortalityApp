@@ -93,6 +93,7 @@ The deployment of this App to shinyapps.io uses the INLA repository at [https://
 install_github("inbo/INLA")
 install_github("richardli/ExcessMortalityApp")
 setwd("inst/shiny/")
+library(rsconnect)
 deployApp()
 ```
 
