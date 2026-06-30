@@ -248,24 +248,41 @@ observeEvent(input$processMe, {
           return(NULL)
         }
         library(INLA)
-        # Patch inla.set.hyper for R 4.2+ compatibility: old inbo/INLA uses && on length>1 vectors
-        local({
-          f <- INLA:::inla.set.hyper
-          src <- deparse(body(f))
-          src <- gsub(
-            "!\\(is\\.na\\(h\\[\\[key\\]\\]\\)\\)",
-            "!all(is.na(h[[key]]))",
-            src, fixed = FALSE
-          )
-          src <- gsub(
-            "&& h\\[\\[key\\]\\] != hyper\\.new\\[\\[idx\\.new\\]\\]\\[\\[key\\]\\]",
-            "&& any(h[[key]] != hyper.new[[idx.new]][[key]])",
-            src, fixed = FALSE
-          )
-          body(f) <- parse(text = paste(src, collapse = "\n"))[[1]]
-          environment(f) <- environment(INLA:::inla.set.hyper)
-          assignInNamespace("inla.set.hyper", f, "INLA")
-        })
+        # Comprehensive patch: old inbo/INLA uses || and && on length>1 vectors,
+        # which became errors in R 4.2+. Scan all INLA namespace functions and fix.
+        if (!isTRUE(getOption(".inla_r42_patched"))) {
+          local({
+            ns <- asNamespace("INLA")
+            .patch_fn <- function(fn_name) {
+              tryCatch({
+                obj <- get(fn_name, envir = ns, inherits = FALSE)
+                if (!is.function(obj)) return(invisible(NULL))
+                src <- deparse(body(obj))
+                orig <- src
+                # Fix: || is.na(expr) → || all(is.na(expr))
+                src <- gsub("\\|\\| is\\.na\\(([^()]+)\\)", "|| all(is.na(\\1))", src, perl = TRUE)
+                # Fix: && !is.na(expr) → && !all(is.na(expr))
+                src <- gsub("&& !is\\.na\\(([^()]+)\\)", "&& !all(is.na(\\1))", src, perl = TRUE)
+                # Fix: !(is.na(expr)) → !all(is.na(expr))
+                src <- gsub("!\\(is\\.na\\(([^()]+)\\)\\)", "!all(is.na(\\1))", src, perl = TRUE)
+                # Fix inla.set.hyper: vector != in && context
+                if (fn_name == "inla.set.hyper")
+                  src <- gsub(
+                    "&& h\\[\\[key\\]\\] != hyper\\.new\\[\\[idx\\.new\\]\\]\\[\\[key\\]\\]",
+                    "&& any(h[[key]] != hyper.new[[idx.new]][[key]])", src)
+                if (identical(src, orig)) return(invisible(NULL))
+                nb <- tryCatch(
+                  parse(text = paste(src, collapse = "\n"))[[1]],
+                  error = function(e) NULL)
+                if (is.null(nb)) return(invisible(NULL))
+                f <- obj; body(f) <- nb; environment(f) <- environment(obj)
+                assignInNamespace(fn_name, f, ns)
+              }, error = function(e) NULL)
+            }
+            lapply(ls(ns), .patch_fn)
+          })
+          options(.inla_r42_patched = TRUE)
+        }
         show_modal_spinner(text = "Fitting the Excess Mortality Model") # show the spinner
         rv[['excess']] <- smooth_model(time_case = time_case, T = T, years = years, morData = morData, sexCol = "sexCol", ageCol = "ageCol", popCol = "popCol", timeCol = "timeCol", use.rate = TRUE)
         remove_modal_spinner() # hide the spinner
