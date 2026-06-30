@@ -248,6 +248,24 @@ observeEvent(input$processMe, {
           return(NULL)
         }
         library(INLA)
+        # Patch inla.set.hyper for R 4.2+ compatibility: old inbo/INLA uses && on length>1 vectors
+        local({
+          f <- INLA:::inla.set.hyper
+          src <- deparse(body(f))
+          src <- gsub(
+            "!\\(is\\.na\\(h\\[\\[key\\]\\]\\)\\)",
+            "!all(is.na(h[[key]]))",
+            src, fixed = FALSE
+          )
+          src <- gsub(
+            "&& h\\[\\[key\\]\\] != hyper\\.new\\[\\[idx\\.new\\]\\]\\[\\[key\\]\\]",
+            "&& any(h[[key]] != hyper.new[[idx.new]][[key]])",
+            src, fixed = FALSE
+          )
+          body(f) <- parse(text = paste(src, collapse = "\n"))[[1]]
+          environment(f) <- environment(INLA:::inla.set.hyper)
+          assignInNamespace("inla.set.hyper", f, "INLA")
+        })
         show_modal_spinner(text = "Fitting the Excess Mortality Model") # show the spinner
         rv[['excess']] <- smooth_model(time_case = time_case, T = T, years = years, morData = morData, sexCol = "sexCol", ageCol = "ageCol", popCol = "popCol", timeCol = "timeCol", use.rate = TRUE)
         remove_modal_spinner() # hide the spinner

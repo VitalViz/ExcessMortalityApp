@@ -50,7 +50,7 @@
         "Description": "The package contains a ShinyApp for easy computation and visualization of excess mortality.",
         "Depends": "R (>= 3.5), shiny, shinyjs, shinyWidgets, shinybusy",
         "Imports": "dplyr, scales, ggplot2, plotly, DT, lubridate, stats",
-        "Additional_repositories": "https://inla.r-inla-download.org/R/testing/",
+        "Additional_repositories": "https://inla.r-inla-download.org/R/stable",
         "Suggests": "INLA",
         "License": "GPL (>= 2)",
         "Encoding": "UTF-8",
@@ -61,15 +61,15 @@
         "RemoteRepo": "ExcessMortalityApp",
         "RemoteUsername": "VitalViz",
         "RemoteRef": "HEAD",
-        "RemoteSha": "c1b42b0b208616f30264c60a8b7b1dd9e0dc617c",
+        "RemoteSha": "56e8ff4286076717fd9493d6db91f740b4a7a7ac",
         "GithubRepo": "ExcessMortalityApp",
         "GithubUsername": "VitalViz",
         "GithubRef": "HEAD",
-        "GithubSHA1": "c1b42b0b208616f30264c60a8b7b1dd9e0dc617c",
+        "GithubSHA1": "56e8ff4286076717fd9493d6db91f740b4a7a7ac",
         "NeedsCompilation": "no",
-        "Packaged": "2026-06-26 14:54:00 UTC; locaranza",
+        "Packaged": "2026-06-30 12:51:29 UTC; locaranza",
         "Author": "Zehang R Li [cre, aut]",
-        "Built": "R 4.6.0; ; 2026-06-26 14:54:01 UTC; windows"
+        "Built": "R 4.6.0; ; 2026-06-30 12:51:31 UTC; windows"
       }
     },
     "INLA": {
@@ -2786,7 +2786,7 @@
       "checksum": "7877dfb1559a37a9725c9eca5ef133ee"
     },
     "server.R": {
-      "checksum": "26c7ef973b5d7da21271cfc080e2386d"
+      "checksum": "a7a8fa1b0ff85ff6180afbb7e5399775"
     },
     "ui.R": {
       "checksum": "b77b6d8dd8b545e979c76897d6ccf87d"
