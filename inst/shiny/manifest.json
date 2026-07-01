@@ -1,7 +1,7 @@
 {
   "version": 1,
   "locale": "en_US",
-  "platform": "4.1.0",
+  "platform": "4.1.3",
   "metadata": {
     "appmode": "shiny",
     "primary_rmd": null,
@@ -114,7 +114,7 @@
       "Repository": "https://cloud.r-project.org",
       "description": {
         "Package": "Matrix",
-        "Version": "1.7-5",
+        "Version": "1.5-4.1",
         "VersionNote": "do also bump src/version.h, inst/include/Matrix/version.h",
         "Date": "2026-03-20",
         "Priority": "recommended",
