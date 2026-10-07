@@ -2,7 +2,9 @@
 
 This is the Shiny Application for excess mortality calculation, developed by the [openVA team](https://openva.net), supported by Vital Strategies. 
 
-An online version of this calculator is at [https://zehangli.shinyapps.io/ExcessMortalityApp/](https://zehangli.shinyapps.io/ExcessMortalityApp/).
+This repository is published at [https://dataviz-excessmortalityapp-new.share.connect.posit.cloud/](https://dataviz-excessmortalityapp-new.share.connect.posit.cloud/)
+
+Original online version of this calculator is at [https://zehangli.shinyapps.io/ExcessMortalityApp/](https://zehangli.shinyapps.io/ExcessMortalityApp/).
 
 # Local installation
 
